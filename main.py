@@ -10,6 +10,8 @@ class Rarity :
     COMMON = 1
     RARE = 2
     SUPER_RARE = 3
+    UBER_RARE = 4
+    LEGEND_RARE = 5
 
 # Classes
 class Cat :

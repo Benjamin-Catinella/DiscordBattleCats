@@ -17,14 +17,48 @@
         "health": 20
     }
     ,
+    "Boogie cat" :
+    {
+        "name"  : "Boogie cat",
+        "image" : "Boogie_cat.webp",
+        "rarity": "common",
+        "power" : 3,
+        "health": 15
+    }
+    ,
     "Axe cat" :
     {
         "name"  : "Axe cat",
         "image" : "Axe_cat.webp",
         "rarity": "common",
-        "power" : 1,
+        "power" : 8,
         "health": 20
     }
-
-
+    ,
+    "Kasli the Bane" :
+    {
+        "name"  : "Kasli the Bane",
+        "image" : "Kasli_the_Bane.webp",
+        "rarity": "Uber_rare",
+        "power" : 56,
+        "health": 127
+    }
+    ,
+    "Wonder momoco" :
+    {
+        "name"  : "Wonder momoco",
+        "image" : "Wonder_momoko.webp",
+        "rarity": "Legend_rare",
+        "power" : 118,
+        "health": 289
+    }
+    ,
+    "Bean cats" :
+    {
+        "name"  : "Bean cats",
+        "image" : "Bean_cats.webp",
+        "rarity": "common",
+        "power" : 8,
+        "health": 35
+    }
 }
