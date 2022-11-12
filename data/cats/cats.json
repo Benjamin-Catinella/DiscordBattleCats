@@ -1,0 +1,30 @@
+{
+    "Cat" : 
+    {
+        "name"  : "Cat",
+        "image" : "Cat.webp",
+        "rarity": "common",
+        "power" : 2,
+        "health": 10
+    }
+    ,
+    "Tank cat" :
+    {
+        "name"  : "Tank cat",
+        "image" : "Tank_cat.webp",
+        "rarity": "common",
+        "power" : 1,
+        "health": 20
+    }
+    ,
+    "Axe cat" :
+    {
+        "name"  : "Axe cat",
+        "image" : "Axe_cat.webp",
+        "rarity": "common",
+        "power" : 1,
+        "health": 20
+    }
+
+
+}
