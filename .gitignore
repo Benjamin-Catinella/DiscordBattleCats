@@ -4,3 +4,5 @@ token
 resources
 
 scratch*.py
+
+__pycache__

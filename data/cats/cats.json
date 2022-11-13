@@ -21,7 +21,7 @@
     {
         "name"  : "Boogie cat",
         "image" : "Boogie_cat.webp",
-        "rarity": "common",
+        "rarity": "special",
         "power" : 3,
         "health": 15
     }
@@ -57,8 +57,26 @@
     {
         "name"  : "Bean cats",
         "image" : "Bean_cats.webp",
-        "rarity": "common",
+        "rarity": "special",
         "power" : 8,
         "health": 35
+    }
+    ,
+    "Salon cat" :
+    {
+        "name"  : "Salon cat",
+        "image" : "Salon_Cat.webp",
+        "rarity": "rare",
+        "power" : 10,
+        "health": 42
+    }
+    ,
+    "Bahamut cat" :
+    {
+        "name"  : "Bahamut cat",
+        "image" : "Bahamut_Cat.webp",
+        "rarity": "special",
+        "power" : 10,
+        "health": 42
     }
 }
