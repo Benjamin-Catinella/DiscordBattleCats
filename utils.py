@@ -2,7 +2,8 @@
 class Logger:
     """Custom logger class
     """
-    DEBUG_LEVEL : int = 0
+    
+    DEBUG_LEVEL : int = 5
     
     @staticmethod
     def log( *args, debug_level : int = 1):
@@ -11,5 +12,6 @@ class Logger:
         Args:
             debug_level (int, optional): Debug level. Defaults to 1.
         """
-        if  debug_level >= Logger.DEBUG_LEVEL:
-            print(args)
+        if  debug_level <= Logger.DEBUG_LEVEL:
+            
+            print(str(args))
