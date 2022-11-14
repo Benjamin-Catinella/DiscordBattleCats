@@ -21,6 +21,13 @@ USER_COMMAND_PREFIX = "dbc! "
 # Other
 MAIN_CHANNEL_ID = 1041000719467151392
 print(f"Logger debug level set to {Logger.DEBUG_LEVEL}")
+CAT_ENCOUNTER_CHANCE = 50
+REACTIONS = {
+    "catch" : "🟩",
+    "no"    : "❌"
+}
+
+
 # Enums
 class Rarity(Enum) :
     COMMON = 1
@@ -31,7 +38,11 @@ class Rarity(Enum) :
     LEGEND_RARE = 6
 
 # Classes
-class Cat :
+class Encounterable:
+    pass
+
+
+class Cat(Encounterable) :
     name   : str
     image  : str
     power  : int
@@ -91,6 +102,12 @@ class JSONToDiscordMessageFormatter:
             t += "\n"
 
         return t
+
+# TODO Implement this in some way later
+class Encounter:
+    def __init__(self, encounterable : Encounterable):
+        pass
+
 
 # Managers
 class JSONInventoryManager:
@@ -195,9 +212,12 @@ if __name__ == "__main__":
                 catToSummon = CatFactory.createCatFromJsonString(cats_list_json[ random.choice( list(cats_list_json) ) ])
         except:
             catToSummon = CatFactory.createCatFromJsonString(cats_list_json[ random.choice( list(cats_list_json) ) ])
-        await channel.send(f"A wild **{str.upper(Rarity(catToSummon.rarity).name)}** {catToSummon.name} appeared ! ", file=discord.File( catToSummon.getCatImageFilePath() ) )
+        return await channel.send(f"A wild **{str.upper(Rarity(catToSummon.rarity).name)}** {catToSummon.name} appeared ! Capture it by clicking the {REACTIONS['catch']}! ", file=discord.File( catToSummon.getCatImageFilePath() ) )
 
-        return
+
+    def try_create_encounter(channel : discord.TextChannel):
+        # 
+        pass
 
     async def sendErrorInChat(channel : discord.TextChannel, errorMessage):
         """ Sends the error in the main discord channel
@@ -230,7 +250,7 @@ if __name__ == "__main__":
             # Get inventory as array
             catsArray = JSONInventoryManager.get_cats_from_id_as_cats(message.author.id)
             # Show inventory
-            if(len(catsArray) == 0):
+            if(len(catsArray) > 0):
                 catsInventoryMessage = JSONToDiscordMessageFormatter.format_cats_inventory(catsArray)
             else:
                 await message.reply("You have no cats :C")
@@ -265,7 +285,8 @@ if __name__ == "__main__":
         elif instruction == "items":
             await command_items(message, args=args)
         else:
-            pass # TODO : Later add a way for the bot to tell the command doesn't exist
+            await message.reply(f"The \"{instruction}\" command doesn't exist")
+            # DONE : Later add a way for the bot to tell the command doesn't exist
 
     # -- Events
     @client.event
@@ -290,15 +311,27 @@ if __name__ == "__main__":
         if Logger.DEBUG_LEVEL >= 2:
             await main_channel.send("I'm alive !")
 
-
+    @client.event
+    async def on_reaction_add(reaction : discord.Reaction, user : discord.Member):
+        print(f"Reaction added from {user.name}")
+        channel : discord.TextChannel = reaction.message.channel
+        #send("<@" + str(user_id) + ">")
+        if user == client.user:
+            return
+        
+        if reaction.emoji == REACTIONS["catch"]:
+            await reaction.message.delete()
+            await channel.send("<@" + str(user.id) + "> Captured the cat !")
+        elif reaction.emoji == REACTIONS["no"]:
+            await reaction.message.delete()
+        
     # -- On message Event
     @client.event
     async def on_message(message : discord.Message):
-        message_being_processed = message
         Logger.log(f"event.on_message : Message from {message.author.name} : {message.content}", debug_level=3)
         #Logger doesn't work here for some reason
 
-        if message.author == client.user:
+        if message.author == client.user or message.author.bot:
             return
         
         # User Commands
@@ -313,11 +346,20 @@ if __name__ == "__main__":
             args : list = message.content.split(" ")[1:]
             cat = ' '.join(args)
             try:
-                await DEBUG_try_summon_cat_in_channel(message.channel, cat)
+                encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel, cat)
+                await encounterMessage.add_reaction(REACTIONS["catch"])
+                await encounterMessage.add_reaction(REACTIONS["no"])
+
+
             except Exception as e:
                 await sendErrorInChat(message.channel, f"Couldn't summon a cat: \n {e}")
             return
-            
+        
+        if(random.randint(0,100) >= CAT_ENCOUNTER_CHANCE):
+            # TODO Don't forget to remove this later because it's mad ugly
+            encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel)
+            await encounterMessage.add_reaction(REACTIONS["catch"])
+            await encounterMessage.add_reaction(REACTIONS["no"])
 
     # Running server    
     client.run(token)
