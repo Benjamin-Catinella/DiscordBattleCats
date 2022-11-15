@@ -49,7 +49,7 @@ class Cat(Encounterable) :
     health : int
     rarity : Rarity
 
-    def __init__(self, name :str, rarity : Rarity, power : int, health : int ,image : str = "unknown.webp",):
+    def __init__(self, name :str, rarity : Rarity, power : int = 0, health : int = 0 ,image : str = "unknown.webp",):
         self.name = name
         try:
             with open(CAT_SPRITES_FOLDER_PATH + image, "r") as f:
@@ -78,8 +78,12 @@ class CatFactory:
         name = jsonString["name"]
         image = jsonString["image"]
         rarity = getattr(Rarity, str.upper(jsonString["rarity"]))
-        power = int(jsonString["power"])
-        health = int(jsonString["health"])
+        try : power = int(jsonString["power"])
+        except : power = 0
+
+        try : health = int(jsonString["health"])
+        except : health = 0
+        
         return Cat(name,rarity,power,health,image)
 
 class JSONToDiscordMessageFormatter:

@@ -8,3 +8,5 @@ scratch*.py
 data/inventories/*.json
 
 __pycache__
+errors.txt
+webscraper/failed.txt
