@@ -2984,6 +2984,11 @@
         "image": "Mousse_(Duck).webp",
         "rarity": "uber_rare"
     },
+    "Cuek": {
+        "name": "Cuek",
+        "image": "Cuek.webp",
+        "rarity": "Legend_rare"
+    },
     "Happosai": {
         "name": "Happosai",
         "image": "Happosai.webp",

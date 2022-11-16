@@ -5,12 +5,39 @@ from os import path
 from enum import Enum
 from utils import *
 from exceptions import *
+from discord import interactions
+from discord import app_commands
+
+"""
+Stuff to change later:
+    - Load/Reload JSON periodically in memory instead of opening the file for every operation; Possible performance gain
+        userinventories["uid"]*dict -> on_content_changed -> save to [userid].json*file
+
+
+    - Cat / CatModel separation
+
+                                | Cat           |
+                                | name, level   | 
+                                    |
+                                    v
+        [ CatModel ]-> get_cat_rarity -> rarity
+                    -> get_cat_image  -> image
+        
+        Could be a better design instead of storing properties multiple times, because for now the database and the object are too tied, meaning that for example
+        if i wanted to change a cat's image (eg: custom cat having a sprite update), i'd have to change it in every player inventory too, same for the rarity
+        or other properties i could add later
+
+
+
+        
+"""
+
 
 #Globals
 # Path related
 RESOURCES_FOLDER = "resources/"
 DATA_FOLDER = "data/"
-CATS_JSON_FILE_PATH = f"{DATA_FOLDER}cats/cats.json"
+CATS_JSON_DB_FILE_PATH = f"{DATA_FOLDER}cats/cats.json"
 CAT_SPRITES_FOLDER_PATH = f"{RESOURCES_FOLDER}Cat_Sprites/"
 USER_INVENTORY_FOLDER_PATH = f"{DATA_FOLDER}inventories/"
 INVENTORY_TEMPLATE_FILE_PATH = f"{DATA_FOLDER}inventory_template.json"
@@ -20,8 +47,9 @@ USER_COMMAND_PREFIX = "dbc! "
 
 # Other
 MAIN_CHANNEL_ID = 1041000719467151392
+DEBUG = True
 print(f"Logger debug level set to {Logger.DEBUG_LEVEL}")
-CAT_ENCOUNTER_CHANCE = 50
+CAT_ENCOUNTER_CHANCE = 1
 REACTIONS = {
     "catch" : "🟩",
     "no"    : "❌"
@@ -29,13 +57,16 @@ REACTIONS = {
 
 
 # Enums
-class Rarity(Enum) :
-    COMMON = 1
-    SPECIAL = 2
-    RARE = 3
-    SUPER_RARE = 4
-    UBER_RARE = 5
-    LEGEND_RARE = 6
+RARITY_MAP = {
+    "COMMON" : "Common",
+    "SPECIAL" : "Special",
+    "RARE" : "Rare",
+    "SUPER_RARE" : "Super rare",
+    "UBER_RARE" : "Uber rare",
+    "LEGEND_RARE" : "Legend rare"
+}
+
+
 
 # Classes
 class Encounterable:
@@ -44,53 +75,72 @@ class Encounterable:
 
 class Cat(Encounterable) :
     name   : str
-    image  : str
-    power  : int
-    health : int
-    rarity : Rarity
 
-    def __init__(self, name :str, rarity : Rarity, power : int = 0, health : int = 0 ,image : str = "unknown.webp",):
+    def __init__(self, name :str):
         self.name = name
-        try:
-            with open(CAT_SPRITES_FOLDER_PATH + image, "r") as f:
-                f.close()
-                self.image = image
-        except:
-            Logger.log(3, f"Couldn't set {self.name} image, setting default")
-            self.image = "unknown.webp"
-
-        self.rarity = rarity
-        self.power = power
-        self.health = health
-    
-    def getCatImageFilePath(self):
-        return CAT_SPRITES_FOLDER_PATH + self.image
 
     def __str__(self) -> str:
-        return f"{self.name} , Image:{self.image} , Rarity:{self.rarity} , Power:{self.power} , Health:{self.health}"
+        return f"{self.name}"
+
+    def toJson(self):
+        return {"name" : self.name}
+
+class CatModel:
+    """ Bunch of static methods to get cat properties from the json database
+    """
+    @staticmethod
+    def get_cat_property(catName, property : str) -> str:
+        """ Fetches a property of a specified cat from the database
+
+        Args:
+            catName (strorCat): str
+            property (str): _description_
+
+        Raises:
+            Exception: Cat doesn't exist in database
+            Exception: Property doesn't exist on the cat
+
+        Returns:
+            str: _description_
+        """
+        if type(catName) is Cat:
+            catName = catName.name
+        with open(CATS_JSON_DB_FILE_PATH, "r") as f:
+            jsondb = json.load(f)
+            try:
+                jsondb[catName]
+            except:
+                raise Exception(f"Cat {catName} doesn't exist in database")
+            try:
+                return jsondb[catName][property]
+            except:
+                raise Exception(f"Property {property} doesn't exist on {catName}")
+    
+    def get_cat_image_image_fullpath(cat : Cat):
+        with open(CATS_JSON_DB_FILE_PATH, "r") as f:
+            jsondb = json.load(f)
+            return CAT_SPRITES_FOLDER_PATH + jsondb[cat.name]["image"]
+
+
 
 # Factories
 class CatFactory:
     
     @staticmethod
-    def createCatFromJsonString(jsonString : dict):
+    def createCatFromDatabaseEntry(jsonString : dict):
         
         name = jsonString["name"]
-        image = jsonString["image"]
-        rarity = getattr(Rarity, str.upper(jsonString["rarity"]))
-        try : power = int(jsonString["power"])
-        except : power = 0
-
-        try : health = int(jsonString["health"])
-        except : health = 0
         
-        return Cat(name,rarity,power,health,image)
+        return Cat(name)
 
-class JSONToDiscordMessageFormatter:
-    """Formats json entries to be displayed in a human readable format to be used in a message
+class TextFormatter:
+    """Formats lots of things to be displayed in a human readable format and be used in a discord message
     """
     
-    
+    @staticmethod
+    def format_rarity(r):
+        pass
+        
     @staticmethod
     def format_cats_inventory(cats : list[Cat]):
         """Example: 
@@ -102,12 +152,12 @@ class JSONToDiscordMessageFormatter:
         """
         t = ""
         for cat in cats:
-            t += f"- {cat.name} | {cat.rarity} | Health : {cat.health} | Power : {cat.power} "
+            t += f"- {cat.name} | { CatModel.get_cat_property(cat.name, 'rarity') } | Level : {'Not implemented yet'}"
             t += "\n"
 
         return t
 
-# TODO Implement this in some way later
+# TODO Implement this in some way later for an easier time with encounter mechanics
 class Encounter:
     def __init__(self, encounterable : Encounterable):
         pass
@@ -115,9 +165,16 @@ class Encounter:
 
 # Managers
 class JSONInventoryManager:
-    
+    """ Static class containing every function in relation to the inventory system
+    """
     @staticmethod
     def create_new_inventory_from_id(uid : int):
+        """Creates inventory file from user id, usually called when the file is non-existent.
+        TODO Later use this function to reset inventories
+
+        Args:
+            uid (int): Discord Member id 
+        """
         Logger.log(f"Creating inventory file for {uid}")
         json_data = ""
         with open(INVENTORY_TEMPLATE_FILE_PATH, 'r') as f:
@@ -125,10 +182,32 @@ class JSONInventoryManager:
         
         with open(f"{USER_INVENTORY_FOLDER_PATH}{str(uid)}.json", "w") as f:
             json.dump(json_data, f, indent=4) 
-    
     @staticmethod
-    def add_cat_to_player_inventory(id: int, cat :Cat):
-        pass
+    def get_player_inventory_file(uid: int):
+        """Centralized method to get the file
+
+        Args:
+            uid (int): Member user id
+
+        Returns:
+            str: File name
+        """
+        return str(uid)+".json"
+
+
+    @staticmethod
+    def add_cat_to_player_inventory(uid: int, cat :Cat):
+        jsonInventory : dict
+        try:
+            with open(USER_INVENTORY_FOLDER_PATH+JSONInventoryManager.get_player_inventory_file(uid), "r") as f:
+                jsonInventory = json.load(f)
+                jsonInventory["cats"].append(cat.toJson())
+            with open(USER_INVENTORY_FOLDER_PATH+JSONInventoryManager.get_player_inventory_file(uid), "w") as f:
+                f.write(json.dumps(jsonInventory, indent=4))
+        except json.JSONDecodeError:
+            JSONInventoryManager.create_new_inventory_from_id(uid)
+            JSONInventoryManager.add_cat_to_player_inventory(uid, cat)
+
 
     @staticmethod
     def remove_cat_from_player_inventory(id: int, cat : Cat):
@@ -163,7 +242,7 @@ class JSONInventoryManager:
         Returns:
             list[object]: List of json objects
         """
-        return json.loads(JSONInventoryManager.get_player_inventory_from_id(uid=uid))["cats"][0]
+        return json.loads(JSONInventoryManager.get_player_inventory_from_id(uid=uid))["cats"]
 
     @staticmethod
     def get_cats_from_id_as_cats(uid :int):
@@ -175,13 +254,47 @@ class JSONInventoryManager:
         Returns:
             list[Cat]: List of cats
         """
-        cats : dict(str,object) = JSONInventoryManager.get_cats_from_id(uid=uid)
+        cats : list(dict(str,object)) = JSONInventoryManager.get_cats_from_id(uid=uid)
         catsToReturn : list(Cat) = []
         for cat in cats:
-            print(cat)
-            catsToReturn.append(CatFactory.createCatFromJsonString(cats[cat])) 
+            catsToReturn.append(CatFactory.createCatFromDatabaseEntry(cat)) 
         return catsToReturn
+
+class MessageToCat : 
+    """Association class to manipulate the summoned cats and the messages they appeared in
+    """
+    __assoc : dict[int ,list[discord.Message, Cat]] = {}
+    
         
+    @staticmethod
+    def get():
+        return MessageToCat.__assoc
+
+    @staticmethod   
+    def get_message(id : int):
+        return MessageToCat.__assoc[id]
+
+    @staticmethod
+    def get_cat(id : int) -> Cat:
+        """Gets cat from the assoc using the message id
+
+        Args:
+            id (int): message id
+
+        Returns:
+            Cat: The cat associated with the message
+        """
+        return MessageToCat.__assoc[id][1]
+    @staticmethod
+    def add(message : discord.Message, cat: Cat):
+        MessageToCat.__assoc[message.id] = [message,cat]
+    
+    @staticmethod
+    def remove(message : discord.Message):
+        MessageToCat.__assoc.pop(message.id)
+
+
+
 
 if __name__ == "__main__":
 
@@ -194,6 +307,9 @@ if __name__ == "__main__":
     intents.members = True
     client = discord.Client(intents = intents)
     
+    # -- interactions
+    
+
     main_channel : discord.TextChannel
     members : list[discord.Member] = []
     guilds : list[discord.Guild] = []
@@ -203,20 +319,36 @@ if __name__ == "__main__":
     message_being_processed : discord.Message
 
     # -- Loading cats
-    cats_list_json : dict = json.loads(open(CATS_JSON_FILE_PATH, 'r').read())
+    cats_list_json : dict = json.loads(open(CATS_JSON_DB_FILE_PATH, 'r').read())
     
     # -- Functions
 
-    async def DEBUG_try_summon_cat_in_channel(channel : discord.TextChannel, catName = None):
+    async def DEBUG_try_summon_cat_in_channel(channel : discord.TextChannel, catName = None, message : discord.Message = None):
+        """DEBUG !!! Used to summon cats for debug purposes
+
+        Args:
+            channel (discord.TextChannel): The channel to summon the cat in
+            catName (str, optional): The name of the cat passed as argument. Defaults to None.
+            message (discord.Message, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         catToSummon : Cat = None
         try:
             if catName is not None:
-                catToSummon = CatFactory.createCatFromJsonString(cats_list_json[catName])
+                catToSummon = CatFactory.createCatFromDatabaseEntry(cats_list_json[catName])
             else:
-                catToSummon = CatFactory.createCatFromJsonString(cats_list_json[ random.choice( list(cats_list_json) ) ])
+                catToSummon = CatFactory.createCatFromDatabaseEntry(cats_list_json[ random.choice( list(cats_list_json) ) ])
         except:
-            catToSummon = CatFactory.createCatFromJsonString(cats_list_json[ random.choice( list(cats_list_json) ) ])
-        return await channel.send(f"A wild **{str.upper(Rarity(catToSummon.rarity).name)}** {catToSummon.name} appeared ! Capture it by clicking the {REACTIONS['catch']}! ", file=discord.File( catToSummon.getCatImageFilePath() ) )
+            catToSummon = CatFactory.createCatFromDatabaseEntry(cats_list_json[ random.choice( list(cats_list_json) ) ])
+        message_sent = await channel.send(
+            f"A wild **{RARITY_MAP[ str.upper(CatModel.get_cat_property(catToSummon, 'rarity'))]}** {catToSummon.name} appeared ! Capture it by clicking {REACTIONS['catch']}! ", 
+            file=discord.File( CatModel.get_cat_image_image_fullpath(catToSummon) ) 
+            )
+        MessageToCat.add(message=message_sent, cat=catToSummon)
+        Logger.log(f"Added {catToSummon} to {message.id} ", debug_level=3)
+        return message_sent
 
 
     def try_create_encounter(channel : discord.TextChannel):
@@ -255,7 +387,7 @@ if __name__ == "__main__":
             catsArray = JSONInventoryManager.get_cats_from_id_as_cats(message.author.id)
             # Show inventory
             if(len(catsArray) > 0):
-                catsInventoryMessage = JSONToDiscordMessageFormatter.format_cats_inventory(catsArray)
+                catsInventoryMessage = TextFormatter.format_cats_inventory(catsArray)
             else:
                 await message.reply("You have no cats :C")
                 return
@@ -271,6 +403,20 @@ if __name__ == "__main__":
             await message.reply("You used the show command")
         else:
             await message.reply(f"Command {args[0]} not yet implemented")
+    def capture_cat(mid: int, uid : int):
+        """ Capture a summoned cat, returns True if succeeded
+        Args:
+            mid (int): Message id
+            uid (int): User id
+        """
+        try:
+            JSONInventoryManager.add_cat_to_player_inventory(
+                uid,
+                MessageToCat.get_cat(mid)
+            )
+        except Exception as e:
+            raise e
+        return True
         
 
     # -- Command management
@@ -315,6 +461,9 @@ if __name__ == "__main__":
         if Logger.DEBUG_LEVEL >= 2:
             await main_channel.send("I'm alive !")
 
+
+    # -- On reaction add event
+    ## Used for the capture mechanic
     @client.event
     async def on_reaction_add(reaction : discord.Reaction, user : discord.Member):
         print(f"Reaction added from {user.name}")
@@ -323,15 +472,28 @@ if __name__ == "__main__":
         if user == client.user:
             return
         
+        
         if reaction.emoji == REACTIONS["catch"]:
-            await reaction.message.delete()
-            await channel.send("<@" + str(user.id) + "> Captured the cat !")
+
+            if capture_cat(reaction.message.id, user.id):
+                capturedCat = MessageToCat.get_cat(reaction.message.id)
+                await reaction.message.delete()
+                await channel.send("<@" + str(user.id) + f"> Captured {capturedCat.name} !")
+
+
         elif reaction.emoji == REACTIONS["no"]:
             await reaction.message.delete()
-        
+    
+
     # -- On message Event
     @client.event
     async def on_message(message : discord.Message):
+        """On message event \n
+        Contains the command processing instructions as well as the cat encounter mechanics
+
+        Args:
+            message (discord.Message): _description_
+        """
         Logger.log(f"event.on_message : Message from {message.author.name} : {message.content}", debug_level=3)
         #Logger doesn't work here for some reason
 
@@ -346,24 +508,30 @@ if __name__ == "__main__":
             return
 
 
+
+        # Debug commands
+        if not DEBUG:
+            return
         if message.content.startswith("$summon"):
             args : list = message.content.split(" ")[1:]
             cat = ' '.join(args)
             try:
-                encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel, cat)
+                encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel, cat, message=message)
                 await encounterMessage.add_reaction(REACTIONS["catch"])
                 await encounterMessage.add_reaction(REACTIONS["no"])
-
+                
+                
 
             except Exception as e:
                 await sendErrorInChat(message.channel, f"Couldn't summon a cat: \n {e}")
+                raise e
             return
         
-        if(random.randint(0,100) >= CAT_ENCOUNTER_CHANCE):
-            # TODO Don't forget to remove this later because it's mad ugly
-            encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel)
-            await encounterMessage.add_reaction(REACTIONS["catch"])
-            await encounterMessage.add_reaction(REACTIONS["no"])
+        # if(random.randint(0,100) >= CAT_ENCOUNTER_CHANCE):
+        #     # TODO Don't forget to remove this later because it's mad ugly
+        #     encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel)
+        #     await encounterMessage.add_reaction(REACTIONS["catch"])
+        #     await encounterMessage.add_reaction(REACTIONS["no"])
 
     # Running server    
     client.run(token)

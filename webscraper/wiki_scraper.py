@@ -23,18 +23,38 @@ RarityMap = {
 }
 
 def get_image(cat_url, filename):
-    if os.path.exists(f"images/{filename}") : return
-    IMGXPATH = "/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[1]/tbody/tr[3]/td/div/div[2]/div/div/a/img"
-    IMGXPATH2 ="/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[3]/tbody/tr[3]/td/div/div[2]/div/div/a/img"
+    if os.path.exists(f"images/{filename}") : 
+        return
+    XPATH_LIST = [
+        "/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[1]/tbody/tr[3]/td/div/div[2]/div/div/a/img",
+        "/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[3]/tbody/tr[3]/td/div/div[2]/div/div/a/img",
+        "/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[2]/tbody/tr[3]/td/div/div[2]/div/div/a/img",
+        "/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[4]/tbody/tr[3]/td/div/div[2]/div/div/a/img",
+        "/html/body/div[4]/div[3]/div[2]/main/div[3]/div[2]/div[1]/table[5]/tbody/tr[3]/td/div/div[2]/div/div/a/img"
+    ]
+    # Requesting the web page
     htmlreq = requests.get(cat_url, headers=HEADERS)
     tree : html.HtmlElement = html.fromstring(htmlreq.content)
-    tr_list : list[html.HtmlElement] = list(tree.xpath(IMGXPATH))
 
-    img_url = tr_list[0].attrib["src"]
+    # Applying XPATH
+    for xpath in XPATH_LIST:
+        try:
+            tr_list : list[html.HtmlElement] = list(tree.xpath(xpath))
+            img_url = tr_list[0].attrib["src"]
+            img_data = requests.get(img_url).content
 
-    img_data = requests.get(img_url).content
+            break
+        except Exception as e:
+            pass
+            
+    else:
+        print(f"Error while gathering data from {cat_url}")
+        return
+    
     with open(f"images/{filename}", 'wb') as handler:
+        print(f"Writing data at {filename}")
         handler.write(img_data)
+
 
 htmlreq = requests.get(URL, headers=HEADERS)
 tree : html.HtmlElement = html.fromstring(htmlreq.content)
@@ -45,7 +65,6 @@ tr_list : list[html.HtmlElement] = list(tree.xpath(XPATH)[0])
 ##print(tree.xpath("/html/body/table/tbody/tr[2]/td[2]")[0].text_content())
 
 cats = {}
-failed_gets = "Fails :\n"
 # get <a> from each td inside the TRs
 for i,tr in enumerate(tr_list): 
     if(i <=4): continue
@@ -70,10 +89,9 @@ for i,tr in enumerate(tr_list):
     try: 
         get_image(href, image)
     except Exception as e:
-        failed_gets += f"{image} failed \n  - {str(e)}\n"
+        print(e)
 
-with open("failed.txt", "w") as f:
-    f.write(failed_gets)
+
 
 
 
