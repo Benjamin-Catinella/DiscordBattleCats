@@ -8,26 +8,9 @@ from exceptions import *
 from discord import app_commands
 
 """
-Stuff to change later:
-    - Load/Reload JSON periodically in memory instead of opening the file for every operation; Possible performance gain
-        userinventories["uid"]*dict -> on_content_changed -> save to [userid].json*file
-
-
-    - Cat / CatModel separation
-
-                                | Cat           |
-                                | name, level   | 
-                                    |
-                                    v
-        [ CatModel ]-> get_cat_rarity -> rarity
-                    -> get_cat_image  -> image
-        
-        Could be a better design instead of storing properties multiple times, because for now the database and the object are too tied, meaning that for example
-        if i wanted to change a cat's image (eg: custom cat having a sprite update), i'd have to change it in every player inventory too, same for the rarity
-        or other properties i could add later
-
-
-
+TODO WHEN GETTING BACK THERE : 
+    Finish the cat_stats command
+    refactor code and place it in modules
         
 """
 
