@@ -5,7 +5,6 @@ from os import path
 from enum import Enum
 from utils import *
 from exceptions import *
-from discord import interactions
 from discord import app_commands
 
 """
@@ -49,14 +48,14 @@ USER_COMMAND_PREFIX = "dbc! "
 MAIN_CHANNEL_ID = 1041000719467151392
 DEBUG = True
 print(f"Logger debug level set to {Logger.DEBUG_LEVEL}")
-CAT_ENCOUNTER_CHANCE = 1
+
+# Cat encounter
+CAT_ENCOUNTER_CHANCE = 2
+CAT_ENCOUNTER_CHANCE_BONUS = 6
 REACTIONS = {
     "catch" : "🟩",
     "no"    : "❌"
 }
-
-
-# Enums
 RARITY_MAP = {
     "COMMON" : "Common",
     "SPECIAL" : "Special",
@@ -64,6 +63,13 @@ RARITY_MAP = {
     "SUPER_RARE" : "Super rare",
     "UBER_RARE" : "Uber rare",
     "LEGEND_RARE" : "Legend rare"
+}
+RARITY_SUMMON_CHANCE = {
+    "COMMON"        : 50,
+    "RARE"          : 31,
+    "SUPER_RARE"    : 15,
+    "UBER_RARE"     : 3.5,
+    "LEGEND_RARE"   : 0.5
 }
 
 
@@ -88,6 +94,15 @@ class Cat(Encounterable) :
 class CatModel:
     """ Bunch of static methods to get cat properties from the json database
     """
+    @staticmethod
+    def get_cat_from_name(catName) -> Cat:
+        with open(CATS_JSON_DB_FILE_PATH, "r") as f:
+            jsondb = json.load(f)
+            try:
+                return CatFactory.createCatFromDatabaseEntry(jsondb[catName])
+            except:
+                raise Exception(f"Cat {catName} doesn't exist in database")
+
     @staticmethod
     def get_cat_property(catName, property : str) -> str:
         """ Fetches a property of a specified cat from the database
@@ -122,7 +137,6 @@ class CatModel:
             return CAT_SPRITES_FOLDER_PATH + jsondb[cat.name]["image"]
 
 
-
 # Factories
 class CatFactory:
     
@@ -150,12 +164,14 @@ class TextFormatter:
         Args:
             cats (list[Cat]): should be the array of cats
         """
-        t = ""
-        for cat in cats:
-            t += f"- {cat.name} | { CatModel.get_cat_property(cat.name, 'rarity') } | Level : {'Not implemented yet'}"
+        t = "```"
+        for i, cat in enumerate(cats):
+            t += f"- {cat.name} | { RARITY_MAP.get(str.upper(CatModel.get_cat_property(cat.name, 'rarity'))) } | Level : {'Not implemented yet'}"
             t += "\n"
-
-        return t
+            if( i > 10):
+                t += "And more... Use /cat_stats for statistics"
+                break
+        return t + "```"
 
 # TODO Implement this in some way later for an easier time with encounter mechanics
 class Encounter:
@@ -204,7 +220,7 @@ class JSONInventoryManager:
                 jsonInventory["cats"].append(cat.toJson())
             with open(USER_INVENTORY_FOLDER_PATH+JSONInventoryManager.get_player_inventory_file(uid), "w") as f:
                 f.write(json.dumps(jsonInventory, indent=4))
-        except json.JSONDecodeError:
+        except:
             JSONInventoryManager.create_new_inventory_from_id(uid)
             JSONInventoryManager.add_cat_to_player_inventory(uid, cat)
 
@@ -295,6 +311,7 @@ class MessageToCat :
 
 
 
+# --------------------------------------- MAIN --------------------------------------- #
 
 if __name__ == "__main__":
 
@@ -307,7 +324,8 @@ if __name__ == "__main__":
     intents.members = True
     client = discord.Client(intents = intents)
     
-    # -- interactions
+    # -- App commands
+    command_tree = app_commands.CommandTree(client)
     
 
     main_channel : discord.TextChannel
@@ -320,10 +338,51 @@ if __name__ == "__main__":
 
     # -- Loading cats
     cats_list_json : dict = json.loads(open(CATS_JSON_DB_FILE_PATH, 'r').read())
+    # Those lists are used to categorize cats by rarity, used for example in the selection of random cats
+    common_cats     : list[str] = []
+    rare_cats       : list[str] = []
+    super_rare_cats : list[str] = []
+    uber_rare_cats  : list[str] = []
+    legend_rare_cats: list[str] = []
+    Logger.log("Adding cat names to their respective rarity list")
+    for cat in cats_list_json:
+        if   cats_list_json[cat]["rarity"] == "common":
+            common_cats.append(cat)
+        elif cats_list_json[cat]["rarity"] == "rare" : 
+            rare_cats.append(cat)
+        elif cats_list_json[cat]["rarity"] == "super_rare" : 
+            super_rare_cats.append(cat)
+        elif cats_list_json[cat]["rarity"] == "uber_rare" : 
+            uber_rare_cats.append(cat)
+        elif cats_list_json[cat]["rarity"] == "legend_rare" : 
+            legend_rare_cats.append(cat)
     
-    # -- Functions
 
-    async def DEBUG_try_summon_cat_in_channel(channel : discord.TextChannel, catName = None, message : discord.Message = None):
+    # -- Functions
+    async def show_cats_from_player_inventory(interaction : discord.Interaction):
+        """Displays a player's cats in their inventory
+
+        Args:
+            interaction (discord.Interaction): the interaction comming from the command
+        """
+        Logger.log("Executing command 'Show cats'", 3)
+        # -- Show cats from inventory
+        # Get inventory as array
+        catsArray = JSONInventoryManager.get_cats_from_id_as_cats(interaction.user.id)
+        # Show inventory
+        if(len(catsArray) > 0):
+            catsInventoryMessage = TextFormatter.format_cats_inventory(catsArray)
+        else:
+            catsInventoryMessage = "You have no cats :C"
+        await interaction.response.send_message(catsInventoryMessage)
+    
+    async def show_cat_stats(interaction : discord.Interaction):
+        #cats = JSONInventoryManager.get_cats_from_id_as_cats(interaction.user.id)
+
+
+        pass
+
+    async def DEBUG_force_summon_cat_in_channel(channel : discord.TextChannel, catName = None, message : discord.Message = None):
         """DEBUG !!! Used to summon cats for debug purposes
 
         Args:
@@ -347,13 +406,67 @@ if __name__ == "__main__":
             file=discord.File( CatModel.get_cat_image_image_fullpath(catToSummon) ) 
             )
         MessageToCat.add(message=message_sent, cat=catToSummon)
-        Logger.log(f"Added {catToSummon} to {message.id} ", debug_level=3)
+        Logger.log(f"Added {catToSummon} to {message_sent.id} ", debug_level=3)
         return message_sent
 
+    def get_random_cat_by_rarity(rarity : str):
+        if rarity == "common":
+            return random.choice(common_cats)
+        elif rarity == "rare":
+            return random.choice(rare_cats)
+        elif rarity == "super_rare":
+            return random.choice(super_rare_cats)
+        elif rarity == "uber_rare":
+            return random.choice(uber_rare_cats)
+        elif rarity == "legend_rare":
+            return random.choice(legend_rare_cats)
+        else: Logger.log("Rarity doesn't exist")
 
-    def try_create_encounter(channel : discord.TextChannel):
-        # 
-        pass
+    async def summon_cat_in_channel(cat : Cat, channel : discord.TextChannel):
+        """Summons a cat in the specified channel
+
+        Args:
+            cat (Cat | str): The cat to summon
+            channel (discord.TextChannel): The TextChannel to summon the cat in
+        """
+        if type(cat) is type(""):
+            cat = CatModel.get_cat_from_name(cat)
+        message : discord.Message = await channel.send(
+            f"A **{RARITY_MAP[ str.upper(CatModel.get_cat_property(cat, 'rarity'))]}** {cat.name}  appeared ! Quick, catch it first!",
+            file=discord.File( CatModel.get_cat_image_image_fullpath(cat))
+            )
+        MessageToCat.add(message, cat)
+        await message.add_reaction(REACTIONS["catch"])
+        
+
+
+    async def try_summon_cat_encounter(channel : discord.TextChannel, override_luck = False):
+        """Tries to summon a cat depending on it's rarity, called verytime a message is sent
+
+        Args:
+            channel (discord.TextChannel): The channel in which to summon the cat
+        """
+        # First define if a cat should be summoned
+        roll = random.randint(0,100)
+        rarity_roll = random.uniform(0,100)
+        if override_luck:
+            roll = 0
+        if not roll < CAT_ENCOUNTER_CHANCE:
+            return
+        
+        if rarity_roll < RARITY_SUMMON_CHANCE["LEGEND_RARE"]:
+            await summon_cat_in_channel(get_random_cat_by_rarity("legend_rare"), channel)
+        elif rarity_roll < RARITY_SUMMON_CHANCE["UBER_RARE"]:
+            await summon_cat_in_channel(get_random_cat_by_rarity("uber_rare"), channel)
+        elif rarity_roll < RARITY_SUMMON_CHANCE["SUPER_RARE"]:
+            await summon_cat_in_channel(get_random_cat_by_rarity("super_rare"), channel)
+        elif rarity_roll < RARITY_SUMMON_CHANCE["RARE"]:
+            await summon_cat_in_channel(get_random_cat_by_rarity("rare"), channel)
+        else:
+            await summon_cat_in_channel(get_random_cat_by_rarity("common"), channel)
+            
+        
+
 
     async def sendErrorInChat(channel : discord.TextChannel, errorMessage):
         """ Sends the error in the main discord channel
@@ -378,7 +491,8 @@ if __name__ == "__main__":
                 JSONInventoryManager.create_new_inventory_from_id(id)
 
     # -- Commands
-    async def command_cats(message : discord.Message, args: list[str]):
+    """
+    async def command_cats(message : discord.Message,):
         Logger.log("Executing command 'cats'", 3)
         
         # -- Show cats from inventory
@@ -395,7 +509,7 @@ if __name__ == "__main__":
 
         else:
             await message.reply(f"Command {args[0]} not yet implemented")
-        
+    """    
 
     async def command_items(message : discord.Message, args: list[str]):
         Logger.log("Executing command 'items'", 3)
@@ -418,7 +532,7 @@ if __name__ == "__main__":
             raise e
         return True
         
-
+    """  Text command management DEPRECATED: using slash commands now
     # -- Command management
     def parse_command(command : str):
         Logger.log(f"Parsing command {command}", 3)
@@ -437,20 +551,21 @@ if __name__ == "__main__":
         else:
             await message.reply(f"The \"{instruction}\" command doesn't exist")
             # DONE : Later add a way for the bot to tell the command doesn't exist
-
+    """
     # -- Events
     @client.event
     async def on_ready():
         # -- Init members/guilds
         guilds = [guild async for guild in client.fetch_guilds(limit=15)]
         tmembers = []
-
+        await command_tree.sync(guild=None)
         for guild in guilds:
             guild : discord.Guild
             tmembers = [member async for member in guild.fetch_members()]
             for member in tmembers:
                 if(member not in members):
                     members.append(member)
+            
 
 
         # -- Inventories
@@ -459,7 +574,7 @@ if __name__ == "__main__":
         print(f'We have logged in as {client.user}')
         main_channel = client.get_channel(MAIN_CHANNEL_ID)
         if Logger.DEBUG_LEVEL >= 2:
-            await main_channel.send("I'm alive !")
+            await client.get_guild(1041000718489882634).get_channel(MAIN_CHANNEL_ID).send("We're alive!")
 
 
     # -- On reaction add event
@@ -489,17 +604,21 @@ if __name__ == "__main__":
     @client.event
     async def on_message(message : discord.Message):
         """On message event \n
-        Contains the command processing instructions as well as the cat encounter mechanics
+        Contains the command processing instructions(Not anymore, now uses / commands) as well as the cat encounter mechanics
 
         Args:
-            message (discord.Message): _description_
+            message (discord.Message): The message gathered from the event
         """
         Logger.log(f"event.on_message : Message from {message.author.name} : {message.content}", debug_level=3)
-        #Logger doesn't work here for some reason
 
         if message.author == client.user or message.author.bot:
             return
         
+        # What should happen when a message is posted
+        await try_summon_cat_encounter(message.channel)
+
+
+        """ DEPRECATED (User commands)
         # User Commands
 
         if message.content.startswith(USER_COMMAND_PREFIX):
@@ -508,7 +627,7 @@ if __name__ == "__main__":
             return
 
 
-
+        
         # Debug commands
         if not DEBUG:
             return
@@ -526,12 +645,47 @@ if __name__ == "__main__":
                 await sendErrorInChat(message.channel, f"Couldn't summon a cat: \n {e}")
                 raise e
             return
+        """
         
-        # if(random.randint(0,100) >= CAT_ENCOUNTER_CHANCE):
-        #     # TODO Don't forget to remove this later because it's mad ugly
-        #     encounterMessage = await DEBUG_try_summon_cat_in_channel(message.channel)
-        #     await encounterMessage.add_reaction(REACTIONS["catch"])
-        #     await encounterMessage.add_reaction(REACTIONS["no"])
 
+    # -- Bot Slash Commands
+
+    # --- User commands
+    # ---- Cats
+    @command_tree.command(name= "show_cats", description="Show cats from your inventory")
+    async def command_show_cats(interaction : discord.Interaction):
+        await show_cats_from_player_inventory(interaction)
+
+    
+    @command_tree.command(name= "cat_stats", description="Displays statistics about the cats you own")
+    async def command_show_cat_stats(interaction : discord.Interaction):
+        await show_cat_stats(interaction)
+        
+
+    # ---- Inventory
+    @command_tree.command(name= "show_items", description="Show your items")
+    async def command_show_items(interaction : discord.Interaction):
+        await interaction.response.send_message("Not implemented")
+
+    # --- Developer commands
+    @command_tree.command(name= "summon", description="DEBUG : Summons a cat")
+    async def summon_command(interaction : discord.Interaction, cat_name: str = None, rarity : str = None):
+        #Creates a cat with either parameters
+        if cat_name is not None:
+            try:
+                await summon_cat_in_channel(cat_name, interaction.channel)
+            except Exception as e:
+                await interaction.response.send_message(e)
+            return
+        elif rarity is not None :
+            # Create cat from rarity
+            cat = get_random_cat_by_rarity(rarity)
+            await summon_cat_in_channel(cat, interaction.channel)
+        else:
+            await try_summon_cat_encounter(interaction.channel, override_luck=True)
+        await interaction.response.send_message("Done")
+
+        
+    
     # Running server    
     client.run(token)
