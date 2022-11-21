@@ -5,7 +5,7 @@ from os import path
 from enum import Enum
 from utils import *
 from exceptions import *
-from discord import app_commands
+from discord import app_commands, Button, ButtonStyle, components 
 
 """
 TODO WHEN GETTING BACK THERE : 
@@ -360,10 +360,37 @@ if __name__ == "__main__":
         await interaction.response.send_message(catsInventoryMessage)
     
     async def show_cat_stats(interaction : discord.Interaction):
-        #cats = JSONInventoryManager.get_cats_from_id_as_cats(interaction.user.id)
+        cats : list[Cat] = JSONInventoryManager.get_cats_from_id_as_cats(interaction.user.id)
+        com = 0
+        sp  = 0
+        rar = 0
+        sr  = 0
+        ur  = 0
+        lr  = 0
+        for cat in cats:
+            rarity = CatModel.get_cat_property(cat, "rarity")
+            if rarity   == "common":
+                com += 1
+            elif rarity == "special":
+                sp += 1
+            elif rarity == "rare":
+                rar += 1
+            elif rarity == "super_rare":
+                sr += 1
+            elif rarity == "uber_rare":
+                ur += 1
+            elif rarity == "legend_rare":
+                lr += 1
 
-
-        pass
+        await interaction.response.send_message(f"""
+            You have : 
+        - - {com} Common cat{"s" if com > 1 else ""}
+        - - {sp} Special cat{"s" if sp > 1 else ""}
+        - - {rar} *Rare* cat{"s" if rar > 1 else ""}
+        - - {sr} **Super rare** cat{"s" if sr > 1 else ""}
+        - - {ur} ***Uber rare*** cat{"s" if ur > 1 else ""}
+        - - {lr} __***Legend rare***__ cat{"s" if lr > 1 else ""}
+        """)
 
     async def DEBUG_force_summon_cat_in_channel(channel : discord.TextChannel, catName = None, message : discord.Message = None):
         """DEBUG !!! Used to summon cats for debug purposes
@@ -600,6 +627,7 @@ if __name__ == "__main__":
         # What should happen when a message is posted
         await try_summon_cat_encounter(message.channel)
 
+        message.reply("Test", )
 
         """ DEPRECATED (User commands)
         # User Commands
@@ -668,6 +696,12 @@ if __name__ == "__main__":
             await try_summon_cat_encounter(interaction.channel, override_luck=True)
         await interaction.response.send_message("Done")
 
+    @command_tree.command(name= "test_button", description="DEBUG : Button test" )
+    async def DEBUG_button_test(interaction : discord.Interaction):
+        view = discord.ui.View()
+        button = discord.ui.Button(style=ButtonStyle.green, label="QUACK")
+        view.add_item(button)
+        await interaction.channel.send(view=view)
         
     
     # Running server    
