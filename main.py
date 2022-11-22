@@ -2,14 +2,13 @@ import discord
 import random
 import json
 from os import path
-from enum import Enum
 from utils import *
 from exceptions import *
 from discord import app_commands, Button, ButtonStyle, components 
 from classes import *
 from globals import *
 
-
+# TODO: Replace reactions with discord UI buttons
 
 # --------------------------------------- MAIN --------------------------------------- #
 
@@ -156,15 +155,24 @@ if __name__ == "__main__":
             cat (Cat | str): The cat to summon
             channel (discord.TextChannel): The TextChannel to summon the cat in
         """
+        view = discord.ui.View()
+        button = CatchButton()
+        button.callback = capture_cat
+        view.add_item(button)
         if type(cat) is type(""):
             cat = CatModel.get_cat_from_name(cat)
         message : discord.Message = await channel.send(
             f"A **{RARITY_MAP[ str.upper(CatModel.get_cat_property(cat, 'rarity'))]}** {cat.name}  appeared ! Quick, catch it first!",
-            file=discord.File( CatModel.get_cat_image_image_fullpath(cat))
+            file=discord.File( CatModel.get_cat_image_image_fullpath(cat)),
+            view=view
             )
-        MessageToCat.add(message, cat)
-        await message.add_reaction(REACTIONS["catch"])
         
+        
+        MessageToCat.add(message, cat)
+
+        #await message.add_reaction(REACTIONS["catch"])
+        
+
 
 
     async def try_summon_cat_encounter(channel : discord.TextChannel, override_luck = False):
@@ -191,6 +199,7 @@ if __name__ == "__main__":
             await summon_cat_in_channel(get_random_cat_by_rarity("rare"), channel)
         else:
             await summon_cat_in_channel(get_random_cat_by_rarity("common"), channel)
+
             
         
 
@@ -244,20 +253,23 @@ if __name__ == "__main__":
             await message.reply("You used the show command")
         else:
             await message.reply(f"Command {args[0]} not yet implemented")
-    def capture_cat(mid: int, uid : int):
-        """ Capture a summoned cat, returns True if succeeded
-        Args:
-            mid (int): Message id
-            uid (int): User id
+
+    async def capture_cat(interaction : discord.Interaction):
+        """Capture a summoned cat
         """
+        uid ,mid = interaction.user.id, interaction.message.id
+        capturedCat = MessageToCat.get_cat(mid)
         try:
             JSONInventoryManager.add_cat_to_player_inventory(
                 uid,
-                MessageToCat.get_cat(mid)
+                capturedCat
             )
         except Exception as e:
             raise e
-        return True
+        
+        await interaction.message.delete()
+        await interaction.channel.send("<@" + str(uid) + f"> Captured {capturedCat.name} !")
+
         
     """  Text command management DEPRECATED: using slash commands now
     # -- Command management
@@ -305,7 +317,6 @@ if __name__ == "__main__":
 
 
     # -- On reaction add event
-    ## Used for the capture mechanic
     @client.event
     async def on_reaction_add(reaction : discord.Reaction, user : discord.Member):
         print(f"Reaction added from {user.name}")
@@ -313,18 +324,7 @@ if __name__ == "__main__":
         #send("<@" + str(user_id) + ">")
         if user == client.user:
             return
-        
-        
-        if reaction.emoji == REACTIONS["catch"]:
 
-            if capture_cat(reaction.message.id, user.id):
-                capturedCat = MessageToCat.get_cat(reaction.message.id)
-                await reaction.message.delete()
-                await channel.send("<@" + str(user.id) + f"> Captured {capturedCat.name} !")
-
-
-        elif reaction.emoji == REACTIONS["no"]:
-            await reaction.message.delete()
     
 
     # -- On message Event
@@ -415,7 +415,8 @@ if __name__ == "__main__":
     @command_tree.command(name= "test_button", description="DEBUG : Button test" )
     async def DEBUG_button_test(interaction : discord.Interaction):
         view = discord.ui.View()
-        button = discord.ui.Button(style=ButtonStyle.green, label="QUACK")
+        button = CatchButton()
+        button.callback = None # Can directly assign functions
         view.add_item(button)
         await interaction.channel.send(view=view)
         
