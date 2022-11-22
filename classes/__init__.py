@@ -7,3 +7,5 @@ from .MessageToCat import *
 from .TextFormatter import *
 from .Exceptions import *
 from .Buttons import *
+from .Views import *
+from .MessageToTextInventory import *

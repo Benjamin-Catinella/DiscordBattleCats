@@ -10,6 +10,7 @@ INVENTORY_TEMPLATE_FILE_PATH = f"{DATA_FOLDER}inventory_template.json"
 
 # Command related
 USER_COMMAND_PREFIX = "dbc! "
+CATS_PER_INV_PAGE = 7
 
 # Other
 MAIN_CHANNEL_ID = 1041000719467151392

@@ -1,14 +1,17 @@
 import discord
 import random
 import json
+import math
 from os import path
 from utils import *
-from exceptions import *
 from discord import app_commands, Button, ButtonStyle, components 
 from classes import *
 from globals import *
 
-# TODO: Replace reactions with discord UI buttons
+# TODO DONE 1: Update the /show_cats command for an easier time showing cats 
+#       (Maybe add a page parameter, and sort by rarity by default eg: /show_cat page:1, sort:level)
+# TODO 2: Catching the same cat should do something else, maybe just not being able to catch it?
+# TODO 999: Write tests :x
 
 # --------------------------------------- MAIN --------------------------------------- #
 
@@ -38,11 +41,11 @@ if __name__ == "__main__":
     # -- Loading cats
     cats_list_json : dict = json.loads(open(CATS_JSON_DB_FILE_PATH, 'r').read())
     # Those lists are used to categorize cats by rarity, used for example in the selection of random cats
-    common_cats     : list[str] = []
-    rare_cats       : list[str] = []
-    super_rare_cats : list[str] = []
-    uber_rare_cats  : list[str] = []
-    legend_rare_cats: list[str] = []
+    common_cats     : list[Cat] = []
+    rare_cats       : list[Cat] = []
+    super_rare_cats : list[Cat] = []
+    uber_rare_cats  : list[Cat] = []
+    legend_rare_cats: list[Cat] = []
     Logger.log("Adding cat names to their respective rarity list")
     for cat in cats_list_json:
         if   cats_list_json[cat]["rarity"] == "common":
@@ -58,22 +61,69 @@ if __name__ == "__main__":
     
 
     # -- Functions
-    async def show_cats_from_player_inventory(interaction : discord.Interaction):
-        """Displays a player's cats in their inventory
+    async def nextPage(interaction: discord.Interaction):
+        page = MessageToTextInventory.get_page(interaction.message.id)
+        try:
+            await show_cats_from_player_inventory(interaction, page+1, edit=True)
+        except Exception as e:
+            raise e
+        MessageToTextInventory.increment(interaction.message)
+
+    async def previousPage(interaction : discord.Interaction):
+        page = MessageToTextInventory.get_page(interaction.message.id)
+        try:
+            await show_cats_from_player_inventory(interaction, page-1, edit=True)
+        except Exception as e:
+            raise e
+        MessageToTextInventory.decrement(interaction.message)
+
+    async def show_cats_from_player_inventory(interaction : discord.Interaction, page=1, edit=False):
+        """Displays a player's cats in their inventory by page, also edits the message
 
         Args:
             interaction (discord.Interaction): the interaction comming from the command
         """
         Logger.log("Executing command 'Show cats'", 3)
-        # -- Show cats from inventory
+
+
         # Get inventory as array
         catsArray = JSONInventoryManager.get_cats_from_id_as_cats(interaction.user.id)
+        tempCatsArray = []
+        maxPage = math.ceil(len(catsArray) / CATS_PER_INV_PAGE)
+        nextOff = False
+        previousOff = False
+        # If inputting a page greater than the max number of pages, shows the last one
+        
+        if(page >= maxPage ): 
+            page = maxPage
+            nextOff = True
+        # If page number is 0 or less
+        if(page <= 1 ): 
+            page = 1
+            previousOff = True
+
         # Show inventory
         if(len(catsArray) > 0):
-            catsInventoryMessage = TextFormatter.format_cats_inventory(catsArray)
+            p = 1
+            for i, cat in enumerate(catsArray):
+                if p == page:
+                    tempCatsArray.append(cat)
+                if (i+1) % CATS_PER_INV_PAGE  == 0:
+                    p += 1
+            catsInventoryMessage = TextFormatter.format_cats_inventory_page(tempCatsArray, page, max_page = maxPage)
         else:
             catsInventoryMessage = "You have no cats :C"
-        await interaction.response.send_message(catsInventoryMessage)
+        view = InventoryNavigationView(previousPage, nextPage, previousOff=previousOff, nextOff=nextOff)
+        if edit:
+            await interaction.response.defer(ephemeral=True)
+            await MessageToTextInventory.get_message(interaction.message.id).edit(content=catsInventoryMessage, view=view)
+        else :
+            message : discord.Message = await interaction.channel.send(catsInventoryMessage, view=view)
+            await interaction.response.send_message("Displaying your inventory...", ephemeral=True)
+        
+        if (not edit):
+            MessageToTextInventory.add(message=message, page=page)
+        
     
     async def show_cat_stats(interaction : discord.Interaction):
         cats : list[Cat] = JSONInventoryManager.get_cats_from_id_as_cats(interaction.user.id)
@@ -136,6 +186,14 @@ if __name__ == "__main__":
         return message_sent
 
     def get_random_cat_by_rarity(rarity : str):
+        """Gets a random cat from the loaded data
+
+        Args:
+            rarity (str): The rarity to look for. eg : "super_rare" | "common"
+
+        Returns:
+            Cat: The cat
+        """
         if rarity == "common":
             return random.choice(common_cats)
         elif rarity == "rare":
@@ -166,13 +224,7 @@ if __name__ == "__main__":
             file=discord.File( CatModel.get_cat_image_image_fullpath(cat)),
             view=view
             )
-        
-        
         MessageToCat.add(message, cat)
-
-        #await message.add_reaction(REACTIONS["catch"])
-        
-
 
 
     async def try_summon_cat_encounter(channel : discord.TextChannel, override_luck = False):
@@ -380,8 +432,8 @@ if __name__ == "__main__":
     # --- User commands
     # ---- Cats
     @command_tree.command(name= "show_cats", description="Show cats from your inventory")
-    async def command_show_cats(interaction : discord.Interaction):
-        await show_cats_from_player_inventory(interaction)
+    async def command_show_cats(interaction : discord.Interaction, page : int = 1):
+        await show_cats_from_player_inventory(interaction, page=page)
 
     
     @command_tree.command(name= "cat_stats", description="Displays statistics about the cats you own")
@@ -414,11 +466,10 @@ if __name__ == "__main__":
 
     @command_tree.command(name= "test_button", description="DEBUG : Button test" )
     async def DEBUG_button_test(interaction : discord.Interaction):
-        view = discord.ui.View()
-        button = CatchButton()
-        button.callback = None # Can directly assign functions
-        view.add_item(button)
-        await interaction.channel.send(view=view)
+        
+
+        await interaction.channel.send(view=CatchCatMessageView(capture_cat))
+        await interaction.response.defer()
         
     
     # Running server    

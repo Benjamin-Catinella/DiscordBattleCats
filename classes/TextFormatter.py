@@ -11,9 +11,7 @@ class TextFormatter:
         
     @staticmethod
     def format_cats_inventory(cats : list[Cat]):
-        """Example: 
-        Your inventory:
-            - Axe cat | Special | HP : 10 | Power : 5
+        """Formats a cat list into a messageable text
 
         Args:
             cats (list[Cat]): should be the array of cats
@@ -25,4 +23,17 @@ class TextFormatter:
             if( i > 10):
                 t += "And more... Use /cat_stats for statistics"
                 break
+        return t + "```"
+    @staticmethod
+    def format_cats_inventory_page(cats : list[Cat], pageNumber, max_page):
+        """Formats a cat list into a messageable text
+
+        Args:
+            cats (list[Cat]): should be the array of cats
+        """
+        t = "```"
+        for i, cat in enumerate(cats):
+            t += f"- {cat.name} | { RARITY_MAP.get(str.upper(CatModel.get_cat_property(cat.name, 'rarity'))) } | Level : {'Not implemented yet'}"
+            t += "\n"
+        t += f"Page : {pageNumber} / {max_page}"
         return t + "```"
