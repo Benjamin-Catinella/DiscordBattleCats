@@ -1,7 +1,6 @@
 #Folders
 .vscode
 token
-resources/*
 __pycache__
 
 

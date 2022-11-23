@@ -8,11 +8,9 @@ from discord import app_commands, Button, ButtonStyle, components
 from classes import *
 from globals import *
 
-# TODO #DONE 1: Fix the bug where, when clicking on someone else's inventory arrows, it shows the inventory of the user who clicked and not the one
-#         of the user who first did the /show_cats
-# TODO #DONE 2: Catching the same cat should do something else, maybe just not being able to catch it?
-# TODO 3: Clean up shit, and then try to deploy the bot on klowbi's and maybe the server Obi and I got, if it can handle multiple
-# TODO 4: For memory usage potential issue, create a loop that will remove each element that's too old in associations
+# TODO 1: Separate dev server inventories from others
+# TODO 1: Clean up shit, and then try to deploy the bot on klowbi's and maybe the server Obi and I got, if it can handle multiple
+# TODO 2: For memory usage potential issue, create a loop that will remove each element that's too old in associations
 # TODO 999: Write tests :x
 
 # --------------------------------------- MAIN --------------------------------------- #
@@ -35,14 +33,13 @@ if __name__ == "__main__":
     main_channel : discord.TextChannel
     members : list[discord.Member] = []
     guilds : list[discord.Guild] = []
-
-    # "pointer" variables
-    member_being_processed : discord.member
-    message_being_processed : discord.Message
+    dev_guild = client.get_guild(DEV_SERVER_ID)
 
     # -- Loading cats
     cats_list_json : dict = json.loads(open(CATS_JSON_DB_FILE_PATH, 'r').read())
+
     # Those lists are used to categorize cats by rarity, used for example in the selection of random cats
+    # TODO (?) Maybe find a better way
     common_cats     : list[Cat] = []
     rare_cats       : list[Cat] = []
     super_rare_cats : list[Cat] = []
@@ -167,7 +164,7 @@ if __name__ == "__main__":
         """)
 
     async def DEBUG_force_summon_cat_in_channel(channel : discord.TextChannel, catName = None, message : discord.Message = None):
-        """DEBUG !!! Used to summon cats for debug purposes
+        """DEPRECATED ! DEBUG !!! Used to summon cats for debug purposes 
 
         Args:
             channel (discord.TextChannel): The channel to summon the cat in
@@ -459,7 +456,7 @@ if __name__ == "__main__":
         await interaction.response.send_message("Not implemented")
 
     # --- Developer commands
-    @command_tree.command(name= "summon", description="DEBUG : Summons a cat")
+    @command_tree.command(name= "summon", description="DEBUG : Summons a cat", guild=dev_guild)
     async def summon_command(interaction : discord.Interaction, cat_name: str = None, rarity : str = None):
         #Creates a cat with either parameters
         if cat_name is not None:
@@ -476,7 +473,7 @@ if __name__ == "__main__":
             await try_summon_cat_encounter(interaction.channel, override_luck=True)
         await interaction.response.send_message("Done")
 
-    @command_tree.command(name= "test_button", description="DEBUG : Button test" )
+    @command_tree.command(name= "test_button", description="DEBUG : Button test" , guild=dev_guild)
     async def DEBUG_button_test(interaction : discord.Interaction):
         
 
