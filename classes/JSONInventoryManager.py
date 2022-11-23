@@ -4,6 +4,7 @@ from globals import *
 from .Cat import Cat
 from os import path
 from .CatFactory import CatFactory
+from .Exceptions import *
 
 class JSONInventoryManager:
     """ Static class containing every function in relation to the inventory system
@@ -37,18 +38,34 @@ class JSONInventoryManager:
 
 
     @staticmethod
-    def add_cat_to_player_inventory(uid: int, cat :Cat):
+    def add_cat_to_player_inventory(uid: int, cat :Cat, hadException = False):
         jsonInventory : dict
+        
         try:
-            with open(USER_INVENTORY_FOLDER_PATH+JSONInventoryManager.get_player_inventory_file(uid), "r") as f:
-                jsonInventory = json.load(f)
-                jsonInventory["cats"].append(cat.toJson())
+            f = open(USER_INVENTORY_FOLDER_PATH+JSONInventoryManager.get_player_inventory_file(uid), "r")
+            jsonInventory = json.load(f)
+            for catI in jsonInventory["cats"]:
+                if catI["name"] == cat.name:
+                    raise CatAlreadyInInventoryException 
+            jsonInventory["cats"].append(cat.toJson())
             with open(USER_INVENTORY_FOLDER_PATH+JSONInventoryManager.get_player_inventory_file(uid), "w") as f:
                 f.write(json.dumps(jsonInventory, indent=4))
-        except:
+        except OSError as e:
+            if hadException:
+                raise InventoryFileErrorException
+            Logger.log(
+                f"""{JSONInventoryManager.__name__}.{JSONInventoryManager.add_cat_to_player_inventory.__name__} : Raised an error when opening the inventory {uid}.json, re-creating it """,
+                debug_level=1
+                )
             JSONInventoryManager.create_new_inventory_from_id(uid)
-            JSONInventoryManager.add_cat_to_player_inventory(uid, cat)
+            JSONInventoryManager.add_cat_to_player_inventory(uid, cat, hadException=True)
+        except CatAlreadyInInventoryException as e:
+            raise e
 
+
+
+
+        
 
     @staticmethod
     def remove_cat_from_player_inventory(id: int, cat : Cat):

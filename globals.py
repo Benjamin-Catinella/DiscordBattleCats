@@ -32,6 +32,14 @@ RARITY_MAP = {
     "UBER_RARE" : "Uber rare",
     "LEGEND_RARE" : "Legend rare"
 }
+RARITY_ID = {
+    "COMMON" : 1,
+    "SPECIAL" : 2,
+    "RARE" : 3,
+    "SUPER_RARE" : 4,
+    "UBER_RARE" : 5,
+    "LEGEND_RARE" : 6
+}
 RARITY_SUMMON_CHANCE = {
     "COMMON"        : 50,
     "RARE"          : 31,

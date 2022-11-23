@@ -8,4 +8,4 @@ from .TextFormatter import *
 from .Exceptions import *
 from .Buttons import *
 from .Views import *
-from .MessageToTextInventory import *
+from .MessageToTextInventoryManager import *

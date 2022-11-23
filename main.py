@@ -8,9 +8,11 @@ from discord import app_commands, Button, ButtonStyle, components
 from classes import *
 from globals import *
 
-# TODO DONE 1: Update the /show_cats command for an easier time showing cats 
-#       (Maybe add a page parameter, and sort by rarity by default eg: /show_cat page:1, sort:level)
-# TODO 2: Catching the same cat should do something else, maybe just not being able to catch it?
+# TODO #DONE 1: Fix the bug where, when clicking on someone else's inventory arrows, it shows the inventory of the user who clicked and not the one
+#         of the user who first did the /show_cats
+# TODO #DONE 2: Catching the same cat should do something else, maybe just not being able to catch it?
+# TODO 3: Clean up shit, and then try to deploy the bot on klowbi's and maybe the server Obi and I got, if it can handle multiple
+# TODO 4: For memory usage potential issue, create a loop that will remove each element that's too old in associations
 # TODO 999: Write tests :x
 
 # --------------------------------------- MAIN --------------------------------------- #
@@ -62,20 +64,26 @@ if __name__ == "__main__":
 
     # -- Functions
     async def nextPage(interaction: discord.Interaction):
-        page = MessageToTextInventory.get_page(interaction.message.id)
+        if interaction.user.id is not MessageToTextInventoryManager.get_user_id(interaction.message.id):
+            await interaction.response.defer()
+            return
+        page = MessageToTextInventoryManager.get_page(interaction.message.id)
         try:
             await show_cats_from_player_inventory(interaction, page+1, edit=True)
         except Exception as e:
             raise e
-        MessageToTextInventory.increment(interaction.message)
+        MessageToTextInventoryManager.increment(interaction.message)
 
     async def previousPage(interaction : discord.Interaction):
-        page = MessageToTextInventory.get_page(interaction.message.id)
+        if interaction.user.id is not MessageToTextInventoryManager.get_user_id(interaction.message.id):
+            await interaction.response.defer()
+            return
+        page = MessageToTextInventoryManager.get_page(interaction.message.id)
         try:
             await show_cats_from_player_inventory(interaction, page-1, edit=True)
         except Exception as e:
             raise e
-        MessageToTextInventory.decrement(interaction.message)
+        MessageToTextInventoryManager.decrement(interaction.message)
 
     async def show_cats_from_player_inventory(interaction : discord.Interaction, page=1, edit=False):
         """Displays a player's cats in their inventory by page, also edits the message
@@ -116,13 +124,13 @@ if __name__ == "__main__":
         view = InventoryNavigationView(previousPage, nextPage, previousOff=previousOff, nextOff=nextOff)
         if edit:
             await interaction.response.defer(ephemeral=True)
-            await MessageToTextInventory.get_message(interaction.message.id).edit(content=catsInventoryMessage, view=view)
+            await MessageToTextInventoryManager.get_message(interaction.message.id).edit(content=catsInventoryMessage, view=view)
         else :
             message : discord.Message = await interaction.channel.send(catsInventoryMessage, view=view)
             await interaction.response.send_message("Displaying your inventory...", ephemeral=True)
         
         if (not edit):
-            MessageToTextInventory.add(message=message, page=page)
+            MessageToTextInventoryManager.add(message=message, page=page, uid=interaction.user.id)
         
     
     async def show_cat_stats(interaction : discord.Interaction):
@@ -215,7 +223,7 @@ if __name__ == "__main__":
         """
         view = discord.ui.View()
         button = CatchButton()
-        button.callback = capture_cat
+        button.callback = try_capture_cat
         view.add_item(button)
         if type(cat) is type(""):
             cat = CatModel.get_cat_from_name(cat)
@@ -306,7 +314,7 @@ if __name__ == "__main__":
         else:
             await message.reply(f"Command {args[0]} not yet implemented")
 
-    async def capture_cat(interaction : discord.Interaction):
+    async def try_capture_cat(interaction : discord.Interaction):
         """Capture a summoned cat
         """
         uid ,mid = interaction.user.id, interaction.message.id
@@ -316,6 +324,10 @@ if __name__ == "__main__":
                 uid,
                 capturedCat
             )
+        except CatAlreadyInInventoryException:
+            # TRANSLATE
+            await interaction.response.send_message("You already have this cat !", ephemeral=True)
+            return
         except Exception as e:
             raise e
         
@@ -468,7 +480,7 @@ if __name__ == "__main__":
     async def DEBUG_button_test(interaction : discord.Interaction):
         
 
-        await interaction.channel.send(view=CatchCatMessageView(capture_cat))
+        await interaction.channel.send(view=CatchCatMessageView(try_capture_cat))
         await interaction.response.defer()
         
     
